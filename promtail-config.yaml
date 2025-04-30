@@ -1,0 +1,36 @@
+#Promtail собирает логи с нашего приложения и отправляет их в Grafana loki
+
+
+server:
+  http_listen_port: 9080 # порт на котором работает Promtail
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml # ???
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push # ручка для отправления логов из Promtail в Grafana loki (ручка для POST запроса)
+
+scrape_configs:
+- job_name: docker-logs
+  static_configs:
+    - targets:
+        - localhost
+      labels:
+        job: docker-logs # метка для имени конфигурации
+        __path__: /var/lib/docker/containers/*/*log  # Указываем путь откуда забираем логи (из stdout docker)
+
+  pipeline_stages: # настройка разбора логов
+  - json:
+      expressions:
+        stream: stream
+        attrs: attrs
+        tag: attrs.tag
+  - regex:
+      expression: (?P<image_name>(?:[^|]*[^|])).(?P<container_name>(?:[^|]*[^|])).(?P<image_id>(?:[^|]*[^|])).(?P<container_id>(?:[^|]*[^|]))
+      source: "tag"
+
+  - labels:
+      tag:
+      image_name:
+      container_name:
